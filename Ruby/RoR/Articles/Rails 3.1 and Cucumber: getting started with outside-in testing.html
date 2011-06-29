@@ -149,6 +149,42 @@ end</code></pre>
     <pre><code>$ rake db:migrate
 $ rake db:test:prepare</code></pre>
     <p>Запустите cucumber снова, шаг пройден. Отлично.</p>
+    <h2>Шаг 3: When I press "Create" (Когда я нажимаю "Создать")</h2>
+    <p><strong>$ cucumber</strong><br />
+    cucumber fails on action 'create' (<em>пер.: cucumber провалился на шаге 'создать'</em>)
+    Решение: добавьте метод create:</p>
+    <pre><code class="language-ruby">def create
+end</code></pre>
+    <p><strong>$ cucumber</strong><br />
+    Снова провал на шаблонах: Missing template books/create with {:handlers=>[:erb<br />
+    Решение: давайте забежим вперед и сделаем редирект на root_path:</p>
+    <pre><code>def create
+  redirect_to books_path
+end</code></pre>
+    <p><strong>$ cucumber</strong><br />
+    Провал, провал и еще раз провал: The action 'index' could not be found for BooksController.<br />
+    Решение: откройте <em>app/controllers/books_controller.rb</em>, добавьте</p>
+    <pre><code class="language-ruby">def index
+end</code></pre>
+    <p><strong>$ cucumber</strong><br />
+    Блин: Missing template books/index with {:handlers=>[:erb.<br />
+    Решение: добавьте app/views/books/index.html.erb:</p>
+    <pre><code>&lt;h2&gt;List books&lt;/h2&gt;</code></pre>
+    <p><strong>$ cucumber</strong><br />
+    Шаг 3 пройден cucumber'ом. Вперед, сквозь тернии.</p>
+    <h2>Шаг 4: Then I should be on the book list page (Затем я должен быть на странице списка книг)</h2>
+    <p><strong>$ cucumber</strong><br />
+    Проблема маршрутизации: Can't find mapping from "the book list page" to a path. (<em>Прим. пер.. Здесь у меня была другая ошибка: stack level too deep (SystemStackError)
+      features/book_pages.feature:6:in `Then I should be on the book list page'</em>)<br />
+    Решение: это новый шаг, мы должны добавить маршрут в <em>features/support/paths.rb</em>, т.к. список в index.html, как мы указали при создании. Сделайте это так:</p>
+    <pre><code>case page_name
+
+  when /the home\s?page/
+    '/'
+
+  when /the book list page/
+    books_path</code></pre>
+    <p>Между прочим, мы прошли Шаг 4.</>
     </div>
 </body>
 </html>
