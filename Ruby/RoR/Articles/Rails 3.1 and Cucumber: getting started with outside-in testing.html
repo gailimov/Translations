@@ -184,7 +184,57 @@ end</code></pre>
 
   when /the book list page/
     books_path</code></pre>
-    <p>Между прочим, мы прошли Шаг 4.</>
+    <p>Между прочим, мы прошли Шаг 4.</p>
+    <h2>Шаг 5: And I should see "War & Peace" (И я должен увидеть "War & Peace")</h2>
+    <p><strong>$ cucumber</strong><br />
+    Блин: Failed assertion, no message given. (MiniTest::Assertion).<br />
+    Решение: отрендерите список книг:</p>
+    <pre><code>$vi app/views/books/index.html.erb
+
+&lt;h2&gt;List books&lt;/h2&gt;
+  <%= render @books %></code></pre>
+    <p><strong>$ cucumber</strong><br />
+    Ууу... undefined method `model_name' for NilClass:Class (ActionView::Template::Error).<br />
+    Решение: выберите список книг:</p>
+    <pre><code class="language-ruby">def index
+  @books = Book.all
+end</code></pre>
+    <p>Все еще провал... <em>Missing partial books/book with {:handlers=>[:erb,.</em><br />
+    Решение: добавьте партиал <em>app/views/books/_book.html.erb</em></p>
+    <pre><code><%= book.name %></code></pre>
+    <p><strong>$ cucumber</strong><br />
+    expected #has_content?("War & Peace") to return true, got false<br />
+    Решение: мы почти все завершили, добавьте немного кода в метод контроллера <em>create</em>:</p>
+    <pre><code class="language-ruby">def create
+  @book = Book.new(params[:book])
+  if @book.save
+    redirect_to root_path
+  end
+end</code></pre>
+    <p>Ниже, то, как теперь должен выглядеть класс контроллера:</p>
+    <pre><code class="language-ruby">class BooksController < ApplicationController
+
+  def index
+    @books = Book.all
+  end
+
+  def new
+    @book = Book.new
+  end
+
+  def create
+    @book = Book.new(params[:book])
+    if @book.save
+      redirect_to root_path
+    end
+  end
+end</code></pre>
+    <p>And that should be it.</p>
+    <p>Note:</p>
+    <ul>
+        <li>Нет RSpec.</li>
+        <li>No custom step definitions, the default code in web_steps.rb worked well enough.</li>
+    </ul>
     </div>
 </body>
 </html>
