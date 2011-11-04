@@ -182,6 +182,133 @@ $crawler = new Crawler();
 $crawler->addContent('<html><body><p>Hello World!</p></body></html>');
  
 print $crawler->filterXPath('descendant-or-self::body/p')->text();</code></pre>
+    <h4>CssSelector</h4>
+    <p>В предыдущем примере для доступа к DOM использовался XPath. Ипользование CSS селекторов вместо него намного проще и таким образом мы имеем компонент CssSelector. Единственная его цель это конвертирование CSS селектора в его XPath эквивалент:</p>
+    <pre><code>use Symfony\Component\CssSelector\CssSelector;
+ 
+print CssSelector::toXPath('div.item > h4 > a');</code></pre>
+    <p>Таким образом вы можете просто использовать CSS селекторы вместе с DomCrawler вместо XPath:</p>
+    <pre><code>use Symfony\Component\DomCrawler\Crawler;
+ 
+$crawler = new Crawler();
+$crawler->addContent('<html><body><p>Hello World!</p></body></html>');
+ 
+print $crawler->filter('body > p')->text();</code></pre>
+    <p>Между прочим, это один из примеров компонента (DomCrawler), опирающегося на возможности другого (CssSelector).</p>
+    <h4>HttpFoundation</h4>
+    <p>Компонент Symfony2 HttpFoundation добавляет к PHP обьектно-ориентированную обертку ко всему, что связано с Web: запросы, ответы, загрузка файлов, куки, сесии...</p>
+    <p>В этом примере мы получаем объект Request из текущих глобальных переменных:</p>
+    <pre><code>use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\HttpFoundation\Response;
+ 
+$request = Request::createFromGlobals();
+echo $request->getPathInfo();</code></pre>
+    <p>Вы также можете создать запрос (Request) напрямую - это интересно для unit-тестов:</p>
+    <pre><code>$request = Request::create('/?foo=bar', 'GET');
+echo $request->getPathInfo();</code></pre>
+    <p>А здесь, то, как создать и отослать ответ (Response):</p>
+    <pre><code>$response = new Response('Not Found', 404, array('Content-Type' => 'text/plain'));
+$response->send();</code></pre>
+    <p>Классы Request и Response имеют много других методов, реализующих спецификацию HTTP.</p>
+    <h4>Routing</h4>
+    <p>Компонент Routing это способ ассоциировать Request с кодом, который конвертирует его в Response. Пример ниже демонстрирует как с помощью всего-лишь 10 строчек кода, вы можете установить полностью работоспособную роутинг систему:</p>
+    <pre><code>use Symfony\Component\HttpFoundation\Request;
+use Symfony\Component\Routing\Matcher\UrlMatcher;
+use Symfony\Component\Routing\RequestContext;
+use Symfony\Component\Routing\RouteCollection;
+use Symfony\Component\Routing\Route;
+ 
+$routes = new RouteCollection();
+$routes->add('hello', new Route('/hello', array('controller' => 'foo')));
+ 
+$context = new RequestContext();
+ 
+// this is optional and can be done without a Request instance
+$context->fromRequest(Request::createFromGlobals());
+ 
+$matcher = new UrlMatcher($routes, $context);
+ 
+$parameters = $matcher->match('/hello');</code></pre>
+    <h4>EventDispatcher</h4>
+    <pre><code>use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\Event;
+ 
+$dispatcher = new EventDispatcher();
+ 
+$dispatcher->addListener('event_name', function (Event $event) {
+    // ...
+});
+ 
+$dispatcher->dispatch('event_name');</code></pre>
+    <h4>DependencyInjection</h4>
+    <p>Даже компонент DependencyInjection действительно прост. Он имеет много возможностей, но его ядро просто в использовании. Видите как легко настроить сервис, опирающийся на другой сервис: </p>
+    <pre><code>use Symfony\Component\DependencyInjection\ContainerBuilder;
+use Symfony\Component\DependencyInjection\Reference;
+ 
+$sc = new ContainerBuilder();
+$sc
+    ->register('foo', '%foo.class%')
+    ->addArgument(new Reference('bar'))
+;
+$sc->setParameter('foo.class', 'Foo');
+ 
+$sc->get('foo');</code></pre>
+    <h4>HttpKernel</h4>
+    <p>Компонент HttpKernel предоставляет <em>динамическую</em> часть спецификации HTTP. Он предоставляет HttpKernelInterface, который является корневым интерфейсом полнофункционального фреймворка Symfony2:</p>
+    <pre><code>interface HttpKernelInterface
+{
+    /**
+     * Handles a Request to convert it to a Response.
+     *
+     * @param  Request $request A Request instance
+     *
+     * @return Response A Response instance
+     */
+    function handle(Request $request, $type = self::MASTER_REQUEST, $catch = true);
+}</code></pre>
+    <p>Он принимает Request, как ввод и должен возвратить Response, как вывод. Использование этого интерфейса делает ваш код совместимым со всеми другими фреймворками, использующими компоненты Symfony2. А также это бесплатно дает вам много крутых вохможностей.</p>
+    <p>Создание фреймворка основанного на компонентах Symfony2 реально просто. Вот очень простой, но обладающий всеми возможностями фреймворк на компонентах Symfony2:</p>
+    <pre><code>$routes = new RouteCollection();
+$routes->add('hello', new Route('/hello', array('_controller' =>
+    function (Request $request) {
+        return new Response(sprintf("Hello %s", $request->get('name')));
+    }
+)));
+ 
+$request = Request::createFromGlobals();
+ 
+$context = new RequestContext();
+$context->fromRequest($request);
+ 
+$matcher = new UrlMatcher($routes, $context);
+ 
+$dispatcher = new EventDispatcher();
+$dispatcher->addSubscriber(new RouterListener($matcher));
+ 
+$resolver = new ControllerResolver();
+ 
+$kernel = new HttpKernel($dispatcher, $resolver);
+ 
+$kernel->handle($request)->send();</code></pre>
+    <p>Это все, что вам нужно для создания гибкого фреймворка на компонентах Symfony2.</p>
+    <p>Хотите добавить обратный HTTP-прокси и получить HTTP-кеширование и Edge Side Includes?</p>
+    <pre><code>$kernel = new HttpKernel($dispatcher, $resolver); 
+ 
+$kernel = new HttpCache($kernel, new Store(__DIR__.'/cache'));</code></pre>
+    <p>Хотите протестировать этот маленький фреймворк функциональными тестами?</p>
+    <pre><code>$client = new Client($kernel);
+$crawler = $client->request('GET', '/hello/Fabien');
+ 
+$this->assertEquals('Fabien', $crawler->filter('p > span')->text());</code></pre>
+    <p>Хотите красивые страницы ошибок вместо уродливых исключений PHP?</p>
+    <pre><code>$dispatcher->addSubscriber(new ExceptionListener(function (Request $request) {
+    $msg = 'Something went wrong! ('.$request->get('exception')->getMessage().')';
+ 
+    return new Response($msg, 500);
+}));</code></pre>
+    <p>Я могу продолжать снова и снова, но думаю вы уловили суть.</p>
+    <p>Вот почему выглядящий просто HttpKernelInterface такой мощный. Он дает вам доступ ко многих крутым возможностям, готовым к использованию из коробки, без особых усилий.</p>
+    <p>Подводя итог скажу, что, компоненты Symfony2 это часто используемые PHP 5.3 библиотеки, которые могут использоваться отдельно. Они хорошо настраиваемые, протестированные и безопасные. И вы должны использовать их, даже если вам не нужно или вы не хотите использовать полнофункциональный фреймворк в следующем проекте.</p>
 </div>
 <body>
 </html>
