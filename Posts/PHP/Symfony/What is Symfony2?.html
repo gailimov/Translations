@@ -74,6 +74,114 @@
     </ul>
     <p>У каждого компонента есть свой <a href="https://github.com/symfony">Git</a> репозитарий. Вы можете получить код напрямую с него, или можете скачать архив, или установить из PEAR или даже установить с развивающегося установщика Composer (Composer это новый PHP установщик, работу над которым сообщество Symfony начало несколько месяцев назад и он будет активно использоваться в проектах Symfony для установки всех зависимостей).</p>
     <p>Во второй части этого поста, я попытаюсь продемонстрировать пощь некоторых компонентов с как можно наименьшим кодом.</p>
+    <h4>ClassLoader</h4>
+    <p>Компонент ClassLoader предоставляет автозагрузчик реализующий стандарт PSR-0 (который является стандартным способом загрузки классов с пространствами имен доступных в PHP 5.3). Также возможна загрузка классов, использующих конвенцию именования PEAR. Это очень гибко, и действительно для классов находящихся в разных директориях, основанных на вложенных пространствах имен. Вы даже можете создавать более, чем одной директории для одного пространства имен.</p>
+    <pre><code>require_once __DIR__.'/src/Symfony/Component/ClassLoader/UniversalClassLoader.php';
+ 
+use Symfony\Component\ClassLoader\UniversalClassLoader;
+ 
+$loader = new UniversalClassLoader();
+$loader->registerNamespaces(array(
+    'Symfony'          => array(__DIR__.'/src', __DIR__.'/symfony/src'),
+    'Doctrine\\Common' => __DIR__.'/vendor/doctrine-common/lib',
+    'Doctrine\\DBAL'   => __DIR__.'/vendor/doctrine-dbal/lib',
+    'Doctrine'         => __DIR__.'/vendor/doctrine/lib',
+    'Monolog'          => __DIR__.'/vendor/monolog/src',
+));
+$loader->registerPrefixes(array(
+    'Twig_' => __DIR__.'/vendor/twig/lib',
+));
+$loader->register();</code></pre>
+    <p>Большую часть времени, Symfony2 ClassLoader это все, что вам нужно для автозагрузки всех ваших классов проекта. И для лучшей производительности, вы можете использовать версию универсального загрузчика классов с APC кешем.</p>
+    <h4>Console</h4>
+    <p>Даже если мы говорим о веб-фреймворке, приятно иметь некоторые инструменты для управления проектом из коммандной строки. В Symfony2 мы используем консоль для генерации CRUD, обновления схемы БД, и т.д. Это не обязательно, но очень удобно и может во много раз увеличить вашу производительность.</p>
+    <p>Это пример показывает как можно очень легко создать инструмент коммандной строки:</p>
+    <pre><code>use Symfony\Component\Console\Application;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Input\InputArgument;
+use Symfony\Component\Console\Input\InputOption;
+use Symfony\Component\Console\Output\OutputInterface;
+ 
+$console = new Application();
+$console
+    ->register('ls')
+    ->setDefinition(array(
+        new InputArgument('dir', InputArgument::REQUIRED, 'Directory name'),
+    ))
+    ->setDescription('Displays the files in the given directory')
+    ->setCode(function (InputInterface $input, OutputInterface $output) {
+        $dir = $input->getArgument('dir');
+ 
+        $output->writeln(sprintf('Dir listing for <info>%s</info>', $dir));
+    })
+;
+$console->run();</code></pre>
+    <p>Всего лишь с 10 строчками кода вы получаете доступ к большому числу возможностей, таких как, подсветка вывода, абстракции для ввода и вывода (ак что вы легко можете протестировать ваши комманды unit-тестами), валидация, автоматические справочные сообщения и многое другое. Это реально мощный компонент.</p>
+    <h4>YAML</h4>
+    <p>YAML великолепный формат конфигурации. Это самый популярный компонент Symfony2 на данный момент, потому что это вероятно единственная библиотека на чистом PHP, реализующая большую часть спецификации YAML 1.2:</p>
+    <pre><code>use Symfony\Component\Yaml\Yaml;
+ 
+$array = Yaml::parse($file);
+ 
+print Yaml::dump($array);</code></pre>
+    <h4>Finder</h4>
+    <p>Finder предоставляет очень удобный и приятный интерфейс для поиска файлов и директорий в файловой системе:</p>
+    <pre><code>use Symfony\Component\Finder\Finder;
+ 
+$finder = new Finder();
+ 
+$iterator = $finder
+  ->files()
+  ->name('*.php')
+  ->depth(0)
+  ->size('>= 1K')
+  ->in(__DIR__);
+ 
+foreach ($iterator as $file) {
+    print $file->getRealpath()."\n";
+}</code></pre>
+    <p>Но вы также можете использовать его для поиска файлов расположенных удаленно, как в этом примере мы ищем файлы на Amazon S3:</p>
+    <pre><code>$s3 = new \Zend_Service_Amazon_S3($key, $secret);
+$s3->registerStreamWrapper("s3");
+ 
+$finder = new Finder();
+$finder->name('photos*')->size('< 100K')->date('since 1 hour ago');
+foreach ($finder->in('s3://bucket-name') as $file) {
+    print $file->getFilename()."\n";
+}</code></pre>
+    <h4>Process</h4>
+    <p>Компонент Process позволяет вам исполнять комманды в подпроцессе. В этом примере, я запускаю простой листинг директорий и получаю результат обратно:</p>
+    <pre><code>use Symfony\Component\Process\Process;
+ 
+$process = new Process('ls -lsa');
+$process->setTimeout(3600);
+$process->run();
+if (!$process->isSuccessful()) {
+    throw new RuntimeException($process->getErrorOutput());
+}
+ 
+print $process->getOutput();</code></pre>
+    <p>Вы можете подумать, что этого легко добиться на чистом PHP, но это не особо так, если вы хотите позаботиться о тонких различиях между различными платформами.</p>
+    <p>И если вы хотите иметь возможность получать ответ в реальном времени, просто передайте анонимную функцию методу run() и вы будете получать буффер вывода как только он станет доступным:</p>
+    <pre><code>use Symfony\Component\Process\Process;
+ 
+$process = new Process('ls -lsa');
+$process->run(function ($type, $buffer) {
+    if ('err' === $type) {
+        echo 'ERR > '.$buffer;
+    } else {
+        echo 'OUT > '.$buffer;
+    }
+});</code></pre>
+    <p>Это великолепно, если вы хотите исполнить долгую комманду (как синхнонизация файлов на удаленном сервере с помощью rsync) и получать ответ в реальном времени.</p>
+    <h4>DomCrawler</h4>
+    <p>Если вы знакомы с jQuery, DomCrawler его PHP эквивалент. Он позволяет вам перемещатьмя по DOM, или HTML, или XML документам:</p>
+    <pre><code>use Symfony\Component\DomCrawler\Crawler;
+ 
+$crawler = new Crawler();
+$crawler->addContent('<html><body><p>Hello World!</p></body></html>');
+ 
+print $crawler->filterXPath('descendant-or-self::body/p')->text();</code></pre>
 </div>
 <body>
 </html>
